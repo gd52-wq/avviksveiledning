@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Røysumtunet - Operativ Avviksstøtte</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/framer-motion@10.16.4/dist/framer-motion.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; color: #0f172a; }
+        .thin-scrollbar::-webkit-scrollbar { width: 5px; }
+        .thin-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 5px; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { motion, AnimatePresence } = window.Motion;
+
+        const AvvikApp = () => {
+            const [incidentCategory, setIncidentCategory] = useState(null);
+            const [activeStep, setActiveStep] = useState(0);
+            const [viewMode, setViewMode] = useState("business");
+            const [isSubmitted, setIsSubmitted] = useState(false);
+            const [reporterName, setReporterName] = useState("Thomas S. Hedlund"); // Simulert EntraID-pålogging
+
+            // Definisjon av kategorier og deres spesifikke prosedyrer
+            const categories = {
+                health: {
+                    id: "health",
+                    label: "Helse & Pasient",
+                    icon: "🏥",
+                    color: "orange",
+                    checklist: [
+                        "Iverksett nødvendig førstehjelp eller akuttmedisinsk bistand.",
+                        "Sikre at pasienten er ivaretatt og stabilisert.",
+                        "Informer vakthavende sykepleier/ansvarlig på avdelingen.",
+                        "Noter tidspunkt og involverte parter for registrering."
+                    ],
+                    system: "Fagsystem (Helse)",
+                    deepDive: "Data fra dette skjemaet sendes med SSO-kontekst direkte til pasientsystemet for journalføring av avviket."
+                },
+                it: {
+                    id: "it",
+                    label: "IT-Sikkerhet",
+                    icon: "💻",
+                    color: "blue",
+                    checklist: [
+                        "IKKE slå av PC-en, men koble fra nettverkskabel/Wi-Fi.",
+                        "Ta bilde av eventuelle feilmeldinger eller løsepengekrav.",
+                        "Endre passord fra en annen, sikker enhet dersom konto er kompromittert.",
+                        "Varsle IKT-vakt umiddelbart på telefon."
+                    ],
+                    system: "IKT Incident Management",
+                    deepDive: "Trigg en Power Automate-flow som isolerer enheten i Microsoft Defender for Endpoint."
+                },
+                hms: {
+                    id: "hms",
+                    label: "Fysiske forhold / HMS",
+                    icon: "👷",
+                    color: "emerald",
+                    checklist: [
+                        "Sperr av området dersom det utgjør fare for andre.",
+                        "Varsle vaktmester eller teknisk drift ved akutte feil (vann/el).",
+                        "Ta bilde av den fysiske mangelen eller hendelsesstedet.",
+                        "Sjekk om verneombud må involveres umiddelbart."
+                    ],
+                    system: "Eiendomsdrift / HMS",
+                    deepDive: "Oppretter automatisk en sak i vaktmesterens Planner-brett med GPS-koordinater/område-ID."
+                }
+            };
+
+            const steps = [
+                { id: 0, title: "Kategorisering", icon: "🔍" },
+                { id: 1, title: "Akuttveiledning", icon: "🛡️" },
+                { id: 2, title: "Registrering", icon: "📝" },
+                { id: 3, title: "Oppfølging", icon: "📈" }
+            ];
+
+            const reset = () => {
+                setIncidentCategory(null);
+                setActiveStep(0);
+                setIsSubmitted(false);
+            };
+
+            return (
+                <div className="min-h-screen p-4 md:p-8 max-w-[1200px] mx-auto flex flex-col relative">
+                    {/* Header - Simulert SharePoint Bar */}
+                    <header className="mb-6 flex flex-col md:flex-row md:justify-between md:items-center bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                        <div>
+                            <h1 className="text-2xl font-black text-slate-900 flex items-center">
+                                <span className="text-orange-600 mr-2 uppercase">Røysumtunet</span> 
+                                <span className="text-slate-400 font-light">| Ansattportal</span>
+                            </h1>
+                            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Interaktiv Prosedyrestøtte & Avvik</p>
+                        </div>
+                        <div className="flex items-center space-x-4 mt-4 md:mt-0 border-t md:border-t-0 pt-4 md:pt-0">
+                            <div className="text-right hidden sm:block">
+                                <p className="text-sm font-black text-slate-800">{reporterName}</p>
+                                <p className="text-[10px] text-emerald-600 font-bold uppercase">Pålogget med Entra ID</p>
+                            </div>
+                            <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center font-bold text-slate-500 border-2 border-white shadow-sm">TH</div>
+                        </div>
+                    </header>
+
+                    {/* Hovedinnhold */}
+                    <div className="grid lg:grid-cols-12 gap-6 flex-1">
+                        
+                        <div className="lg:col-span-8 space-y-6">
+                            {/* Steg-indikator */}
+                            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                                <div className="flex justify-between items-center relative">
+                                    <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-slate-100 -z-0" />
+                                    {steps.map((s, i) => (
+                                        <div key={i} className="relative z-10 flex flex-col items-center">
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all ${activeStep >= i ? 'bg-orange-600 text-white shadow-md scale-110' : 'bg-slate-100 text-slate-400'}`}>
+                                                {s.icon}
+                                            </div>
+                                            <span className={`text-[9px] mt-2 font-black uppercase tracking-tighter ${activeStep === i ? 'text-orange-600' : 'text-slate-400'}`}>{s.title}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Dynamisk boks basert på steg */}
+                            <AnimatePresence mode="wait">
+                                {activeStep === 0 && (
+                                    <motion.div key="step0" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}} className="bg-white p-8 rounded-3xl border border-slate-200 shadow-lg min-h-[450px] flex flex-col">
+                                        <h2 className="text-2xl font-black mb-2">Hva gjelder avviket?</h2>
+                                        <p className="text-slate-500 mb-8 font-medium text-lg">Velg kategori for å få riktig veiledning og prosedyrer.</p>
+                                        
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1">
+                                            {Object.values(categories).map(cat => (
+                                                <button 
+                                                    key={cat.id} 
+                                                    onClick={() => {setIncidentCategory(cat); setActiveStep(1);}}
+                                                    className="p-6 rounded-2xl border-2 border-slate-100 hover:border-orange-500 hover:bg-orange-50 transition-all group text-left flex flex-col justify-between"
+                                                >
+                                                    <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">{cat.icon}</div>
+                                                    <div>
+                                                        <div className="font-black text-slate-800 text-lg">{cat.label}</div>
+                                                        <div className="text-xs text-slate-400 font-bold uppercase mt-1">Gå til prosedyre →</div>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {activeStep === 1 && (
+                                    <motion.div key="step1" initial={{opacity:0, x:20}} animate={{opacity:1, x:0}} exit={{opacity:0, x:-20}} className="bg-white p-8 rounded-3xl border border-slate-200 shadow-lg min-h-[450px] flex flex-col">
+                                        <div className="flex justify-between items-start mb-6">
+                                            <div>
+                                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-${incidentCategory.color}-100 text-${incidentCategory.color}-700`}>Akuttveiledning</span>
+                                                <h2 className="text-3xl font-black mt-2">Dette må du gjøre nå:</h2>
+                                            </div>
+                                            <div className="text-5xl">{incidentCategory.icon}</div>
+                                        </div>
+                                        
+                                        <div className="space-y-4 flex-1">
+                                            {incidentCategory.checklist.map((item, i) => (
+                                                <motion.div 
+                                                    initial={{opacity:0, x:-10}} animate={{opacity:1, x:0}} transition={{delay: i*0.1}}
+                                                    key={i} className="flex items-center p-4 bg-slate-50 rounded-xl border border-slate-100 group hover:border-orange-200 transition-colors"
+                                                >
+                                                    <div className="w-8 h-8 rounded-full bg-white border-2 border-orange-500 text-orange-600 flex items-center justify-center font-black mr-4 shrink-0">{i+1}</div>
+                                                    <p className="text-slate-700 font-bold text-base">{item}</p>
+                                                </motion.div>
+                                            ))}
+                                        </div>
+
+                                        <div className="mt-8 flex justify-end">
+                                            <button onClick={() => setActiveStep(2)} className="bg-orange-600 text-white font-black px-10 py-4 rounded-xl shadow-lg hover:bg-orange-700 uppercase text-sm tracking-widest transition-all hover:scale-105 active:scale-95">
+                                                Jeg har utført tiltakene - Gå til registrering →
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {activeStep === 2 && (
+                                    <motion.div key="step2" initial={{opacity:0, scale:0.95}} animate={{opacity:1, scale:1}} className="bg-white p-8 rounded-3xl border border-slate-200 shadow-lg min-h-[450px] flex flex-col">
+                                        <h2 className="text-2xl font-black mb-2 text-slate-800 tracking-tight">Registrering av hendelse</h2>
+                                        <p className="text-slate-500 mb-6 font-medium">Dataene under sendes direkte til {incidentCategory.system} via SSO.</p>
+                                        
+                                        <div className="bg-slate-50 p-6 rounded-2xl border-2 border-dashed border-slate-200 space-y-6">
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Innmeldt av</label>
+                                                    <div className="p-3 bg-white border border-slate-200 rounded-lg font-bold text-slate-800">{reporterName}</div>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kategori</label>
+                                                    <div className="p-3 bg-white border border-slate-200 rounded-lg font-bold text-slate-800">{incidentCategory.label}</div>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kort beskrivelse av hva som skjedde</label>
+                                                <textarea className="w-full p-4 bg-white border border-slate-200 rounded-lg font-medium text-slate-800 focus:border-orange-500 focus:outline-none h-32" placeholder="Beskriv hendelsen her..."></textarea>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-auto pt-6 flex flex-col md:flex-row gap-4">
+                                            <button onClick={() => { setIsSubmitted(true); setActiveStep(3); }} className="flex-1 bg-emerald-600 text-white font-black py-4 rounded-xl shadow-lg hover:bg-emerald-700 uppercase text-xs tracking-widest transition-all">
+                                                Send til {incidentCategory.system} (Med SSO)
+                                            </button>
+                                            <button onClick={() => setViewMode("tech")} className="px-8 py-4 bg-slate-800 text-white rounded-xl font-bold text-xs uppercase tracking-widest">
+                                                Se teknisk rørgate ⚙️
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {activeStep === 3 && (
+                                    <motion.div key="step3" initial={{opacity:0, scale:1.1}} animate={{opacity:1, scale:1}} className="bg-white p-8 rounded-3xl border border-slate-200 shadow-lg min-h-[450px] flex flex-col items-center justify-center text-center">
+                                        <div className="w-24 h-24 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-5xl mb-6 animate-bounce">✓</div>
+                                        <h2 className="text-3xl font-black text-slate-800 mb-2">Avviket er registrert!</h2>
+                                        <p className="text-slate-500 max-w-md mx-auto font-medium text-lg leading-relaxed">
+                                            Saken er tildelt saksnummer <span className="text-orange-600 font-black">#AVV-2024-0418</span>. 
+                                            Din avdelingsleder og verneombud har mottatt varsel i Teams.
+                                        </p>
+                                        <div className="mt-10 grid grid-cols-2 gap-4 w-full max-w-md">
+                                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                                <div className="text-[10px] font-black text-slate-400 uppercase">Status</div>
+                                                <div className="font-bold text-orange-600">Til Vurdering</div>
+                                            </div>
+                                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                                <div className="text-[10px] font-black text-slate-400 uppercase">Saksbehandler</div>
+                                                <div className="font-bold text-slate-700">Leder Avd. A</div>
+                                            </div>
+                                        </div>
+                                        <button onClick={reset} className="mt-8 text-slate-400 font-bold hover:text-orange-600 uppercase text-xs tracking-widest transition-colors">Start ny registrering</button>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+
+                        {/* Sidebar - Dynamisk Støtteinfo */}
+                        <div className="lg:col-span-4 space-y-6">
+                            {/* Arkitektur-modus (Viser hva som skjer bak) */}
+                            {viewMode === "tech" && (
+                                <motion.div initial={{opacity:0, x:20}} animate={{opacity:1, x:0}} className="bg-slate-900 text-white p-6 rounded-3xl shadow-xl border-b-8 border-orange-500 relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-4 text-4xl opacity-10 font-black">API</div>
+                                    <h3 className="text-xs font-black text-orange-400 uppercase tracking-widest mb-4">Teknisk Rørgate</h3>
+                                    <p className="text-xs text-slate-300 leading-relaxed mb-6">
+                                        {incidentCategory.deepDive}
+                                    </p>
+                                    <div className="space-y-4">
+                                        <div className="flex items-center space-x-3 bg-white/5 p-3 rounded-xl border border-white/10">
+                                            <div className="text-xl">🔑</div>
+                                            <div className="text-[10px] font-bold">Autentisering via Entra ID (OIDC)</div>
+                                        </div>
+                                        <div className="flex items-center space-x-3 bg-white/5 p-3 rounded-xl border border-white/10">
+                                            <div className="text-xl">⚡</div>
+                                            <div className="text-[10px] font-bold">Power Automate ruter til {incidentCategory.system}</div>
+                                        </div>
+                                        <div className="flex items-center space-x-3 bg-white/5 p-3 rounded-xl border border-white/10">
+                                            <div className="text-xl">📊</div>
+                                            <div className="text-[10px] font-bold">Logging i SharePoint Compliance List</div>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setViewMode("business")} className="mt-6 w-full py-2 bg-orange-600 rounded-lg text-[10px] font-black uppercase tracking-widest">Skjul tekniske detaljer</button>
+                                </motion.div>
+                            )}
+
+                            {/* Kontaktinfo / Hurtighjelp */}
+                            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                                <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-4 border-b pb-3">Trenger du akutt hjelp?</h3>
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center group cursor-pointer">
+                                        <span className="text-sm font-bold text-slate-600 group-hover:text-orange-600 transition-colors">IKT-Vakt</span>
+                                        <span className="text-xs font-black bg-slate-100 px-3 py-1 rounded-full group-hover:bg-orange-100 transition-colors">TLF: 99 88 77 66</span>
+                                    </div>
+                                    <div className="flex justify-between items-center group cursor-pointer">
+                                        <span className="text-sm font-bold text-slate-600 group-hover:text-orange-600 transition-colors">Beredskapsleder</span>
+                                        <span className="text-xs font-black bg-slate-100 px-3 py-1 rounded-full group-hover:bg-orange-100 transition-colors">Teams-anrop 📞</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Læring & Compliance */}
+                            <div className="bg-emerald-600 p-6 rounded-3xl text-white shadow-lg">
+                                <h3 className="text-[10px] font-black uppercase tracking-widest mb-2 opacity-80">Hvorfor vi melder avvik</h3>
+                                <p className="text-sm font-bold leading-relaxed italic">
+                                    "Din åpenhet i dag forhindrer en ulykke i morgen. Vi fokuserer på systemlæring, ikke skyldplassering."
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<AvvikApp />);
+    </script>
+</body>
+</html>
